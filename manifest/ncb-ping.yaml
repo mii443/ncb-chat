@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ncb-ping-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ncb-ping
+  template:
+    metadata:
+      labels:
+        app: ncb-ping
+    spec:
+      containers:
+        - name: ping
+          image: ghcr.io/morioka22/ncb-ping
+          env:
+          - name: NCB_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: ncb-secret
+                key: BOT_TOKEN
+          - name: NCB_APP_ID
+            valueFrom:
+              secretKeyRef:
+                name: ncb-secret
+                key: APP_ID

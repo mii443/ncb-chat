@@ -1,0 +1,26 @@
+[package]
+name = "ncb-ping"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+serde_json = "1.0"
+serde = "1.0"
+toml = "0.5"
+async-trait = "0.1.57"
+chrono = "0.4.23"
+
+[dependencies.uuid]
+version = "0.8"
+features = ["serde", "v4"]
+
+[dependencies.serenity]
+version = "0.11.5"
+features = ["builder", "cache", "client", "gateway", "model", "utils", "unstable_discord_api", "collector", "rustls_backend", "framework", "voice"]
+
+
+[dependencies.tokio]
+version = "1.0"
+features = ["macros", "rt-multi-thread", "sync"]
