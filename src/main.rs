@@ -5,8 +5,8 @@ mod events;
 
 use std::{collections::HashMap, env, sync::Arc};
 
-use config::Config;
-use data::PingData;
+use config::{Config, ConfigData};
+use data::{ChatGPTData, IndividualChatGPTData, LlamaData};
 use event_handler::Handler;
 use serenity::{
     client::Client, framework::StandardFramework, futures::lock::Mutex, prelude::GatewayIntents,
@@ -40,10 +40,26 @@ async fn main() {
         } else {
             let token = env::var("NCB_TOKEN").unwrap();
             let application_id = env::var("NCB_APP_ID").unwrap();
+            let llama_url = env::var("LLAMA_URL").unwrap();
+            let openai_key = env::var("OPENAI_KEY").unwrap();
+            let chatgpt_allows = env::var("CHATGPT_ALLOWS").unwrap().to_string();
+            let chatgpt_allows: Vec<i64> = chatgpt_allows
+                .split(",")
+                .map(|f| i64::from_str_radix(f, 10).unwrap())
+                .collect();
+            let chatgpt_forums = env::var("CHATGPT_FORUMS").unwrap().to_string();
+            let chatgpt_forums: Vec<i64> = chatgpt_forums
+                .split(",")
+                .map(|f| i64::from_str_radix(f, 10).unwrap())
+                .collect();
 
             Config {
                 token,
                 application_id: u64::from_str_radix(&application_id, 10).unwrap(),
+                llama_url,
+                openai_key,
+                chatgpt_allows,
+                chatgpt_forums,
             }
         }
     };
@@ -56,7 +72,10 @@ async fn main() {
     // Create TTS storage
     {
         let mut data = client.data.write().await;
-        data.insert::<PingData>(Arc::new(Mutex::new(HashMap::default())));
+        data.insert::<LlamaData>(Arc::new(Mutex::new(HashMap::default())));
+        data.insert::<ChatGPTData>(Arc::new(Mutex::new(HashMap::default())));
+        data.insert::<IndividualChatGPTData>(Arc::new(Mutex::new(HashMap::default())));
+        data.insert::<ConfigData>(Arc::new(Mutex::new(config)));
     }
 
     // Run client

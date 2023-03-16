@@ -2,8 +2,8 @@ version: '3'
 
 services:
     ncb-ping:
-        container_name: ncb-ping
-        image: ghcr.io/morioka22/ncb-ping:0.0.1
+        container_name: ncb-chat
+        image: ghcr.io/morioka22/ncb-chat:0.0.1
         environment:
         - NCB_TOKEN=YOUR_BOT_TOKEN
         - NCB_APP_ID=YOUR_BOT_ID
