@@ -1,9 +1,10 @@
 use chrono::Utc;
 use serenity::{
     http::CacheHttp,
-    model::prelude::{GuildChannel, Message},
+    model::prelude::{GuildChannel, Message, MessageId, ReactionType},
     prelude::Context,
 };
+use url::Url;
 
 use crate::{
     config::*,
@@ -130,9 +131,21 @@ pub async fn message(ctx: Context, message: Message) {
     let mut llama_storage = llama_storage_lock.lock().await;
 
     if let Some(mut llama) = llama_storage.clone().get_mut(&message.channel_id) {
-        let typing = message.channel_id.start_typing(&ctx.http).unwrap();
         let mut history = llama.history.clone();
-        let text = translate_ja_en(message.content.clone()).await;
+
+        if message.content.trim() == "reset".to_string() {
+            llama.history = vec![];
+            llama_storage.insert(llama.channel, llama.clone());
+            message
+                .reply(&ctx.http, "会話履歴をリセットしました。")
+                .await
+                .unwrap();
+            return;
+        }
+
+        let typing = message.channel_id.start_typing(&ctx.http).unwrap();
+        //let text = translate_ja_en(message.content.clone()).await;
+        let text = message.content.clone();
         println!("{}", text);
         history.push(LlamaMessage {
             role: "user".to_string(),
@@ -141,32 +154,87 @@ pub async fn message(ctx: Context, message: Message) {
         llama.history = history.clone();
         llama_storage.insert(llama.channel, llama.clone());
 
-        let request = LlamaRequest { messages: history };
+        let request = LlamaRequest {
+            messages: history.clone(),
+        };
 
+        let (mut socket, response) = tungstenite::connect(Url::parse("ws://192.168.0.19:18080/").unwrap()).expect("Can't connect to websocket server");
+
+        socket.write_message(tungstenite::Message::Text(serde_json::to_string(&request).unwrap().into())).unwrap();
+
+        let mut buffer = String::default();
+        let rate = 3;
+        let mut count = 0;
+
+        let mut response_message: Message = if let Ok(s) = socket.read_message() {
+            if let tungstenite::Message::Text(msg) = s {
+                buffer = buffer + &msg.to_string();
+                message.channel_id.send_message(&ctx.http, |f| f.content(msg)).await.unwrap()
+            } else {
+                panic!("cannot read message");
+            }
+        } else {
+            panic!("cannot read message");
+        };
+
+        loop {
+            if let Ok(s) = socket.read_message() {
+                match s {
+                    tungstenite::Message::Text(msg) => {
+                        buffer = buffer + &msg.to_string();
+                        println!("{}", msg.to_string());
+
+                        if count == rate {
+                            response_message.edit(&ctx.http, |f| f.content(buffer.clone())).await.unwrap();
+                            count = 0;
+                        }
+                        count += 1;
+                    }
+                    _ => {
+                        break;
+                    }
+                }
+            }
+        }
+
+        response_message.edit(&ctx.http, |f| f.content(buffer.clone())).await.unwrap();
+        response_message.react(&ctx.http, ReactionType::Unicode("✅".to_string())).await.unwrap();
+
+        typing.stop().unwrap();
+/*
         let client = reqwest::Client::new();
         match client
-            .post("http://localhost:18080/")
+            .get("http://localhost:18080/")
             .header(reqwest::header::CONTENT_TYPE, "application/json")
             .body(serde_json::to_string(&request).unwrap())
             .send()
             .await
         {
             Ok(ok) => {
-                let response = ok.text().await.expect("ERROR");
-                let response = translate_en_ja(response).await;
-                println!("{}", response);
+                let response_en = ok.text().await.expect("ERROR").trim().to_string();
+                //let response = translate_en_ja(response_en.clone()).await;
+                //println!("JA: {}", response);
+                println!("EN: {}", response_en);
+
+                history.push(LlamaMessage {
+                    role: "ai".to_string(),
+                    content: response_en.clone(),
+                });
+
+                llama.history = history;
+
+                llama_storage.insert(llama.channel, llama.clone());
+
                 message
                     .channel_id
-                    .send_message(&ctx.http, |f| f.content(response))
+                    .send_message(&ctx.http, |f| f.content(response_en))
                     .await
                     .unwrap();
             }
             Err(err) => {
                 panic!("Error")
             }
-        }
-
-        typing.stop().unwrap();
+        } */
     }
 
     let chatgpt_storage_lock = {
